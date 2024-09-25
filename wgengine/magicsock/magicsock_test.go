@@ -28,6 +28,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/google/go-cmp/cmp"
 	wgconn "github.com/tailscale/wireguard-go/conn"
 	"github.com/tailscale/wireguard-go/device"
 	"github.com/tailscale/wireguard-go/tun/tuntest"
@@ -1188,6 +1189,98 @@ func testTwoDevicePing(t *testing.T, d *devices) {
 		checkStats(t, m1, m1Conns)
 		checkStats(t, m2, m2Conns)
 	})
+	t.Run("compare-metrics-stats", func(t *testing.T) {
+		setT(t)
+		defer setT(outerT)
+		m1.conn.resetMetricsForTest()
+		m1.stats.TestExtract()
+		m2.conn.resetMetricsForTest()
+		m2.stats.TestExtract()
+		t.Logf("Metrics before: %s\n", m1.metrics.String())
+		ping1(t)
+		ping2(t)
+		assertConnStatsAndUserMetricsEqual(t, m1)
+		assertConnStatsAndUserMetricsEqual(t, m2)
+		t.Logf("Metrics after: %s\n", m1.metrics.String())
+	})
+}
+
+func (c *Conn) resetMetricsForTest() {
+	c.metrics.inboundBytesIPv4Total.Set(0)
+	c.metrics.inboundPacketsIPv4Total.Set(0)
+	c.metrics.outboundBytesIPv4Total.Set(0)
+	c.metrics.outboundPacketsIPv4Total.Set(0)
+	c.metrics.inboundBytesIPv6Total.Set(0)
+	c.metrics.inboundPacketsIPv6Total.Set(0)
+	c.metrics.outboundBytesIPv6Total.Set(0)
+	c.metrics.outboundPacketsIPv6Total.Set(0)
+	c.metrics.inboundBytesDERPTotal.Set(0)
+	c.metrics.inboundPacketsDERPTotal.Set(0)
+	c.metrics.outboundBytesDERPTotal.Set(0)
+	c.metrics.outboundPacketsDERPTotal.Set(0)
+}
+
+func assertConnStatsAndUserMetricsEqual(t *testing.T, ms *magicStack) {
+	_, phys := ms.stats.TestExtract()
+
+	physIPv4RxBytes := int64(0)
+	physIPv4TxBytes := int64(0)
+	physDERPRxBytes := int64(0)
+	physDERPTxBytes := int64(0)
+	physIPv4RxPackets := int64(0)
+	physIPv4TxPackets := int64(0)
+	physDERPRxPackets := int64(0)
+	physDERPTxPackets := int64(0)
+	for conn, count := range phys {
+		t.Logf("physconn src: %s, dst: %s", conn.Src.String(), conn.Dst.String())
+		if conn.Dst.String() == "127.3.3.40:1" {
+			physDERPRxBytes += int64(count.RxBytes)
+			physDERPTxBytes += int64(count.TxBytes)
+			physDERPRxPackets += int64(count.RxPackets)
+			physDERPTxPackets += int64(count.TxPackets)
+		} else {
+			physIPv4RxBytes += int64(count.RxBytes)
+			physIPv4TxBytes += int64(count.TxBytes)
+			physIPv4RxPackets += int64(count.RxPackets)
+			physIPv4TxPackets += int64(count.TxPackets)
+		}
+	}
+
+	metricIPv4RxBytes := ms.conn.metrics.inboundBytesIPv4Total.Value()
+	metricIPv4RxPackets := ms.conn.metrics.inboundPacketsIPv4Total.Value()
+	metricIPv4TxBytes := ms.conn.metrics.outboundBytesIPv4Total.Value()
+	metricIPv4TxPackets := ms.conn.metrics.outboundPacketsIPv4Total.Value()
+
+	metricDERPRxBytes := ms.conn.metrics.inboundBytesDERPTotal.Value()
+	metricDERPRxPackets := ms.conn.metrics.inboundPacketsDERPTotal.Value()
+	metricDERPTxBytes := ms.conn.metrics.outboundBytesDERPTotal.Value()
+	metricDERPTxPackets := ms.conn.metrics.outboundPacketsDERPTotal.Value()
+
+	assertEqual(t, "derp bytes inbound", physDERPRxBytes, metricDERPRxBytes)
+	assertEqual(t, "derp bytes outbound", physDERPTxBytes, metricDERPTxBytes)
+	assertEqual(t, "ipv4 bytes inbound", physIPv4RxBytes, metricIPv4RxBytes)
+	assertEqual(t, "ipv4 bytes outbound", physIPv4TxBytes, metricIPv4TxBytes)
+	assertEqual(t, "derp packets inbound", physDERPRxPackets, metricDERPRxPackets)
+	assertEqual(t, "derp packets outbound", physDERPTxPackets, metricDERPTxPackets)
+	assertEqual(t, "ipv4 packets inbound", physIPv4RxPackets, metricIPv4RxPackets)
+	assertEqual(t, "ipv4 packets outbound", physIPv4TxPackets, metricIPv4TxPackets)
+
+	// Validate that the usermetrics and clientmetrics are in sync
+	// Note: the clientmetrics are global, this means that when they are registering with the
+	// wgengine, multiple in-process nodes used by this test will be updating the same metrics. This is why we need to multiply
+	// the metrics by 2 to get the expected value.
+	// TODO(kradalby): https://github.com/tailscale/tailscale/issues/13420
+	assertEqual(t, "outbound UDP packets - compare with clientmetric", metricSendUDP.Value(), metricIPv4TxPackets*2)
+	assertEqual(t, "inbound IPv4 packets - compare with clientmetric", metricRecvDataPacketsIPv4.Value(), metricIPv4RxPackets*2)
+	assertEqual(t, "inbound DERP packets - compare with clientmetric", metricRecvDataPacketsDERP.Value(), metricDERPRxPackets*2)
+}
+
+func assertEqual(t *testing.T, name string, a, b any) {
+	t.Helper()
+	t.Logf("assertEqual %s: %v == %v", name, a, b)
+	if diff := cmp.Diff(a, b); diff != "" {
+		t.Errorf("%s mismatch (-want +got):\n%s", name, diff)
+	}
 }
 
 func TestDiscoMessage(t *testing.T) {
