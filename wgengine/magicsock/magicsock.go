@@ -117,21 +117,15 @@ type pathLabel struct {
 type metrics struct {
 	// inboundPacketsTotal is the total number of inbound packets received,
 	// labeled by the path the packet took.
-	inboundPacketsIPv4OKTotal  *expvar.Int
-	inboundPacketsIPv6OKTotal  *expvar.Int
-	inboundPacketsDERPOKTotal  *expvar.Int
-	inboundPacketsIPv4ErrTotal *expvar.Int
-	inboundPacketsIPv6ErrTotal *expvar.Int
-	inboundPacketsDERPErrTotal *expvar.Int
+	inboundPacketsIPv4OKTotal *expvar.Int
+	inboundPacketsIPv6OKTotal *expvar.Int
+	inboundPacketsDERPOKTotal *expvar.Int
 
 	// inboundBytesTotal is the total number of inbound bytes received,
 	// labeled by the path the packet took.
-	inboundBytesIPv4OKTotal  *expvar.Int
-	inboundBytesIPv6OKTotal  *expvar.Int
-	inboundBytesDERPOKTotal  *expvar.Int
-	inboundBytesIPv4ErrTotal *expvar.Int
-	inboundBytesIPv6ErrTotal *expvar.Int
-	inboundBytesDERPErrTotal *expvar.Int
+	inboundBytesIPv4OKTotal *expvar.Int
+	inboundBytesIPv6OKTotal *expvar.Int
+	inboundBytesDERPOKTotal *expvar.Int
 
 	// outboundPacketsTotal is the total number of outbound packets sent,
 	// labeled by the path the packet took.
@@ -633,19 +627,13 @@ func registerMetrics(reg *usermetric.Registry) *metrics {
 		"Counts the number of bytes sent to other peers",
 	)
 	m := metrics{
-		inboundPacketsIPv4OKTotal:  &expvar.Int{},
-		inboundPacketsIPv4ErrTotal: &expvar.Int{},
-		inboundPacketsIPv6OKTotal:  &expvar.Int{},
-		inboundPacketsIPv6ErrTotal: &expvar.Int{},
-		inboundPacketsDERPOKTotal:  &expvar.Int{},
-		inboundPacketsDERPErrTotal: &expvar.Int{},
+		inboundPacketsIPv4OKTotal: &expvar.Int{},
+		inboundPacketsIPv6OKTotal: &expvar.Int{},
+		inboundPacketsDERPOKTotal: &expvar.Int{},
 
-		inboundBytesIPv4OKTotal:  &expvar.Int{},
-		inboundBytesIPv4ErrTotal: &expvar.Int{},
-		inboundBytesIPv6OKTotal:  &expvar.Int{},
-		inboundBytesIPv6ErrTotal: &expvar.Int{},
-		inboundBytesDERPOKTotal:  &expvar.Int{},
-		inboundBytesDERPErrTotal: &expvar.Int{},
+		inboundBytesIPv4OKTotal: &expvar.Int{},
+		inboundBytesIPv6OKTotal: &expvar.Int{},
+		inboundBytesDERPOKTotal: &expvar.Int{},
 
 		outboundPacketsIPv4OKTotal:  &expvar.Int{},
 		outboundPacketsIPv4ErrTotal: &expvar.Int{},
